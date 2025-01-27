@@ -1,20 +1,17 @@
 use core::fmt;
 use std::io;
 
-
 #[derive(Debug)]
 pub enum BinaryFileReaderError {
     IO(io::Error),
-    
+
     BufferUnderflow {
         requested_bytes: usize,
         current_offset: usize,
         available_bytes: usize,
     },
-    
-    Expect {
-        
-    }
+
+    Expect {},
 }
 
 impl From<io::Error> for BinaryFileReaderError {
@@ -28,10 +25,9 @@ impl std::error::Error for BinaryFileReaderError {
         match self {
             BinaryFileReaderError::IO(err) => Some(err),
             BinaryFileReaderError::BufferUnderflow { .. } => None,
-            BinaryFileReaderError::Expect {  } => None,
+            BinaryFileReaderError::Expect {} => None,
         }
     }
-
 }
 
 impl fmt::Display for BinaryFileReaderError {

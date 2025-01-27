@@ -339,8 +339,8 @@ mod tests {
         let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
         let taked = reader.take_bytes(2)?;
 
-        assert_eq!(reader.available_bytes(),3);
-        assert_eq!(reader.current_offset(),2);
+        assert_eq!(reader.available_bytes(), 3);
+        assert_eq!(reader.current_offset(), 2);
 
         assert_eq!(taked, VecDeque::from([0x01, 0x02]));
         assert!(reader.expect(&[0x03, 0x04, 0x05]).is_ok());

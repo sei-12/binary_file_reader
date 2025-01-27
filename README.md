@@ -1,2 +1,2 @@
-# binary_reader
-Simple binary data reader and manipulator for Rust.
+# binary_file_reader
+Simple binary file data reader for Rust.

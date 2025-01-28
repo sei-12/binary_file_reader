@@ -256,6 +256,37 @@ impl<'a> BinaryFileReader<'a> {
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let text = "Hello, world!";
+    /// let binary_data: Vec<u8> = text.as_bytes().to_vec();
+    /// let mut reader = BinaryFileReader::new(&binary_data);
+    /// assert_eq!(reader.read_utf8(13)?,"Hello, world!");
+    /// assert!(reader.read_utf8(10).is_err());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn read_utf8(&mut self, bytes: usize) -> Result<&'a str, BinaryFileReaderError> {
+        if bytes > self.available_bytes() {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: bytes,
+                current_offset: self.current_offset,
+                available_bytes: self.available_bytes(),
+            });
+        }
+
+        let slice = &self.buf[self.current_offset..self.current_offset + bytes];
+        let result = std::str::from_utf8(slice)?;
+        self.current_offset += bytes;
+        Ok(result)
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buffer = vec![0xab,0xcd];
     /// let reader = BinaryFileReader::new(&buffer);
     /// assert_eq!(reader.peek_u4()?,(0x0a,0x0b));
@@ -403,6 +434,37 @@ impl<'a> BinaryFileReader<'a> {
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let text = "Hello, world!";
+    /// let binary_data: Vec<u8> = text.as_bytes().to_vec();
+    /// let mut reader = BinaryFileReader::new(&binary_data);
+    /// assert_eq!(reader.peek_utf8(13)?,"Hello, world!");
+    /// assert_eq!(reader.peek_utf8(13)?,"Hello, world!");
+    /// assert!(reader.peek_utf8(14).is_err());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_utf8(&self, bytes: usize) -> Result<&'a str, BinaryFileReaderError> {
+        if bytes > self.available_bytes() {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: bytes,
+                current_offset: self.current_offset,
+                available_bytes: self.available_bytes(),
+            });
+        }
+
+        let slice = &self.buf[self.current_offset..self.current_offset + bytes];
+        let result = std::str::from_utf8(slice)?;
+        Ok(result)
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buffer = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     ///
     /// let mut reader = BinaryFileReader::new(&buffer);
@@ -421,6 +483,30 @@ impl<'a> BinaryFileReader<'a> {
     pub fn expect(&mut self, expect_bytes: &[u8]) -> Result<(), BinaryFileReaderError> {
         self.expect_peek(expect_bytes)?;
         self.current_offset += expect_bytes.len();
+        Ok(())
+    }
+
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let text = "Hello, world!";
+    /// let binary_data: Vec<u8> = text.as_bytes().to_vec();
+    /// let mut reader = BinaryFileReader::new(&binary_data);
+    ///
+    /// reader.expect_utf8("Hello")?;
+    /// assert!(reader.expect_utf8("Hello").is_err());
+    /// reader.expect_utf8(", world!")?;
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn expect_utf8(&mut self, expect_str: &str) -> Result<(), BinaryFileReaderError> {
+        self.expect(expect_str.as_bytes())?;        
         Ok(())
     }
 
@@ -613,6 +699,26 @@ mod tests {
         let reader = BinaryFileReader::new(&buffer);
         reader.expect_peek(&[0, 1, 2, 3])?;
         reader.expect_peek(&[0, 1, 2, 3])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_utf8() -> Result<(), BinaryFileReaderError> {
+
+        let text = "Hello, world!";
+        let binary_data: Vec<u8> = text.as_bytes().to_vec();
+        let mut reader = BinaryFileReader::new(&binary_data);
+        assert_eq!(reader.peek_utf8(13)?, "Hello, world!");
+        assert_eq!(reader.read_utf8(13)?, "Hello, world!");
+        assert!(reader.read_utf8(10).is_err());
+        
+
+        let text = "こんにちは";
+        let binary_data: Vec<u8> = text.as_bytes().to_vec();
+        let mut reader = BinaryFileReader::new(&binary_data);
+        assert_eq!(reader.peek_utf8(15)?, "こんにちは");
+        assert!(reader.read_utf8(10).is_err());
 
         Ok(())
     }

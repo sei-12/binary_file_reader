@@ -1,0 +1,7 @@
+[package]
+name = "read-png"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+binary_file_reader.path = "../.."

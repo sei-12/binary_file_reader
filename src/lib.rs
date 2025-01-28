@@ -182,6 +182,72 @@ impl BinaryFileReader {
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04,0x05]);
+    /// assert_eq!(reader.read_u32()?,0x01020304);
+    /// assert!(reader.read_u32().is_err());
+    /// assert_eq!(reader.read()?,0x05);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn read_u32(&mut self) -> Result<u32, BinaryFileReaderError> {
+        if self.buffer.len() < 4 {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 4,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+
+        let mut buffer = [0; 4];
+        let drained_data: Vec<u8> = self.buffer.drain(0..4).collect();
+        buffer.copy_from_slice(&drained_data);
+
+        self.current_offset += 4;
+
+        Ok(u32::from_be_bytes(buffer))
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09]);
+    /// assert_eq!(reader.read_u64()?,0x0102030405060708);
+    /// assert!(reader.read_u64().is_err());
+    /// assert_eq!(reader.read()?,0x09);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn read_u64(&mut self) -> Result<u64, BinaryFileReaderError> {
+        if self.buffer.len() < 8 {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 8,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+
+        let mut buffer = [0; 8];
+        let drained_data: Vec<u8> = self.buffer.drain(0..8).collect();
+        buffer.copy_from_slice(&drained_data);
+
+        self.current_offset += 8;
+
+        Ok(u64::from_be_bytes(buffer))
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x12,0x34]);
     /// let (upper,lower) = reader.read_u4()?;
     /// assert_eq!(upper,0x01);
@@ -302,6 +368,71 @@ impl BinaryFileReader {
         Ok((upper << 8) | (lower))
     }
 
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
+    /// assert_eq!(reader.peek_u32()?,0x01020304);
+    /// assert_eq!(reader.peek_u32()?,0x01020304);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_u32(&self) -> Result<u32, BinaryFileReaderError> {
+        if self.buffer.len() < 4 {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 4,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+
+        let mut buffer = [0; 4];
+        for (i,b) in buffer.iter_mut().enumerate() {
+            *b = self.buffer[i];
+        }
+
+        Ok(u32::from_be_bytes(buffer))
+    }
+    
+    
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08]);
+    /// assert_eq!(reader.peek_u64()?,0x0102030405060708);
+    /// assert_eq!(reader.peek_u64()?,0x0102030405060708);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_u64(&self) -> Result<u64, BinaryFileReaderError> {
+        if self.buffer.len() < 8 {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 8,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+
+        let mut buffer = [0; 8];
+        for (i,b) in buffer.iter_mut().enumerate() {
+            *b = self.buffer[i];
+        }
+
+        Ok(u64::from_be_bytes(buffer))
+    }
+    
+    
     /// # Examples
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
@@ -679,6 +810,31 @@ mod tests {
         ));
         assert_eq!(reader.read()?, 0x05);
 
+        let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+        assert_eq!(reader.read_u32()?, 0x01020304);
+        assert!(matches!(
+            reader.read_u32(),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 4,
+                current_offset: 4,
+                available_bytes: 1,
+            }),
+        ));
+        assert_eq!(reader.read()?, 0x05);
+        
+        let mut reader = BinaryFileReader::from(vec![1,2,3,4,5,6,7,8,9]);
+        assert_eq!(reader.read_u64()?, 0x0102030405060708);
+        assert_eq!(reader.current_offset(),8);
+        assert!(matches!(
+            reader.read_u64(),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 8,
+                current_offset: 8,
+                available_bytes: 1,
+            }),
+        ));
+        assert_eq!(reader.read()?, 0x09);
+
         Ok(())
     }
 
@@ -744,6 +900,13 @@ mod tests {
                 got: 256
             })
         ));
+        
+        assert_eq!(reader1.peek_u32()?, 0x01020304);
+        assert_eq!(reader1.peek_u64()?, 0x0102030405060708);
+        
+        assert_eq!(reader1.current_offset(),1);
+
+        
         Ok(())
     }
 }

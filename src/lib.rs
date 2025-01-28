@@ -616,35 +616,34 @@ mod tests {
 
         Ok(())
     }
-    
+
     #[test]
     fn test1() -> Result<(), BinaryFileReaderError> {
-
         let buffer = (0..=255).collect::<Vec<u8>>();
         let mut reader = BinaryFileReader::new(&buffer);
-        
+
         reader.read_u8()?;
-        assert_eq!(reader.available_bytes(),255);
+        assert_eq!(reader.available_bytes(), 255);
         reader.read_u8()?;
-        assert_eq!(reader.available_bytes(),254);
+        assert_eq!(reader.available_bytes(), 254);
         reader.read_u4()?;
-        assert_eq!(reader.available_bytes(),253);
+        assert_eq!(reader.available_bytes(), 253);
         reader.read_u16()?;
-        assert_eq!(reader.available_bytes(),251);
+        assert_eq!(reader.available_bytes(), 251);
         reader.read_u16()?;
-        assert_eq!(reader.available_bytes(),249);
-        
+        assert_eq!(reader.available_bytes(), 249);
+
         let mut b = vec![0; 200];
         reader.read_bytes(&mut b)?;
-        assert_eq!(reader.available_bytes(),49);
-        
+        assert_eq!(reader.available_bytes(), 49);
+
         let mut splited = reader.split_off_front(20)?;
-        
-        assert_eq!(reader.available_bytes(),29);
-        assert_eq!(splited.available_bytes(),20);
-        
+
+        assert_eq!(reader.available_bytes(), 29);
+        assert_eq!(splited.available_bytes(), 20);
+
         let a = splited.split_off_front(20)?;
-        assert_eq!(splited.available_bytes(),0);
+        assert_eq!(splited.available_bytes(), 0);
         assert!(splited.read_u8().is_err());
         assert!(splited.read_u4().is_err());
         assert!(splited.read_u128().is_err());
@@ -652,9 +651,8 @@ mod tests {
         assert!(splited.read_u64().is_err());
         assert!(splited.read_bytes(&mut b).is_err());
         assert!(splited.read_u8().is_err());
-        
 
-        assert_eq!(a.available_bytes(),20);
+        assert_eq!(a.available_bytes(), 20);
 
         Ok(())
     }

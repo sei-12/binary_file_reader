@@ -12,6 +12,11 @@ pub enum BinaryFileReaderError {
     },
 
     Expect {},
+
+    OufOfRange {
+        buffer_size: usize,
+        got: usize,
+    },
 }
 
 impl From<io::Error> for BinaryFileReaderError {
@@ -26,6 +31,7 @@ impl std::error::Error for BinaryFileReaderError {
             BinaryFileReaderError::IO(err) => Some(err),
             BinaryFileReaderError::BufferUnderflow { .. } => None,
             BinaryFileReaderError::Expect {} => None,
+            BinaryFileReaderError::OufOfRange { .. } => None,
         }
     }
 }
@@ -46,6 +52,10 @@ impl fmt::Display for BinaryFileReaderError {
             BinaryFileReaderError::Expect {  } => write!(
                 f,
                 "", 
+            ),
+            BinaryFileReaderError::OufOfRange { .. } => write!(
+                f,
+                ""
             )
         }
     }

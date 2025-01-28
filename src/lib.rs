@@ -116,6 +116,7 @@ impl BinaryFileReader {
     //                                                READ                                                //
     //                                                                                                    //
     //----------------------------------------------------------------------------------------------------//
+
     /// # Examples
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
@@ -240,15 +241,129 @@ impl BinaryFileReader {
         self.current_offset += n;
         Ok(taked)
     }
-    
-    
-    
+
+    //----------------------------------------------------------------------------------------------------//
+    //                                                                                                    //
+    //                                                PEEK                                                //
+    //                                                                                                    //
+    //----------------------------------------------------------------------------------------------------//
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let reader = BinaryFileReader::from(vec![0x01,0x02]);
+    /// assert_eq!(reader.peek()?,0x01);
+    /// assert_eq!(reader.peek()?,0x01);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek(&self) -> Result<u8, BinaryFileReaderError> {
+        match self.buffer.front() {
+            Some(val) => Ok(*val),
+            None => Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 0,
+                current_offset: self.current_offset,
+                available_bytes: self.available_bytes(),
+            }),
+        }
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let reader = BinaryFileReader::from(vec![0x01,0x02]);
+    /// assert_eq!(reader.peek_u16()?,0x0102);
+    /// assert_eq!(reader.peek_u16()?,0x0102);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_u16(&self) -> Result<u16, BinaryFileReaderError> {
+        if self.buffer.len() < 2 {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 2,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+
+        let upper = self.buffer.front().copied().unwrap() as u16;
+        let lower = self.buffer.get(1).copied().unwrap() as u16;
+
+        Ok((upper << 8) | (lower))
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let reader = BinaryFileReader::from(vec![0x12,0x34]);
+    /// assert_eq!(reader.peek_u4()?,(0x01,0x02));
+    /// assert_eq!(reader.peek_u4()?,(0x01,0x02));
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_u4(&self) -> Result<(u8, u8), BinaryFileReaderError> {
+        match self.buffer.front() {
+            Some(shifted) => {
+                let upper = shifted >> 4;
+                let lower = shifted & 0x0f;
+                Ok((upper, lower))
+            }
+            None => Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 1,
+                current_offset: self.current_offset,
+                available_bytes: 0,
+            }),
+        }
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// let v: Vec<u8> = (0..=255).collect();
+    /// let mut reader = BinaryFileReader::from(v);
+    /// assert_eq!(reader.peek_at(0)?,0);
+    /// assert_eq!(reader.peek_at(0)?,0);
+    /// assert_eq!(reader.peek_at(100)?,100);
+    /// assert_eq!(reader.peek_at(200)?,200);
+    /// assert!(reader.peek_at(256).is_err());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_at(&self, at: usize) -> Result<u8, BinaryFileReaderError> {
+        match self.buffer.get(at) {
+            Some(shifted) => Ok(*shifted),
+            None => Err(BinaryFileReaderError::OufOfRange {
+                buffer_size: self.buffer.len(),
+                got: at,
+            }),
+        }
+    }
 
     //----------------------------------------------------------------------------------------------------//
     //                                                                                                    //
     //                                               EXPECT                                               //
     //                                                                                                    //
-    //----------------------------------------------------------------------------------------------------//   
+    //----------------------------------------------------------------------------------------------------//
 
     /// # Examples
     /// ```
@@ -331,7 +446,6 @@ impl BinaryFileReader {
     pub fn take(self) -> VecDeque<u8> {
         self.buffer
     }
-
 }
 
 impl From<Vec<u8>> for BinaryFileReader {
@@ -344,8 +458,6 @@ impl From<Vec<u8>> for BinaryFileReader {
         }
     }
 }
-
-
 
 //----------------------------------------------------------------------------------------------------//
 //                                                                                                    //
@@ -368,16 +480,14 @@ mod tests {
 
         assert_eq!(taked, VecDeque::from([0x01, 0x02]));
         assert!(reader.expect(&[0x03, 0x04, 0x05]).is_ok());
-        
 
         let v: Vec<u8> = (0..=255).collect();
         let mut reader = BinaryFileReader::from(v);
         let taked = reader.read_bytes(128)?;
         assert_eq!(taked, (0..128).collect::<Vec<u8>>());
         reader.expect_peek(&(128..=255).collect::<Vec<u8>>())?;
-        assert_eq!(reader.available_bytes(),128);
-        assert_eq!(reader.current_offset(),128);
-
+        assert_eq!(reader.available_bytes(), 128);
+        assert_eq!(reader.current_offset(), 128);
 
         Ok(())
     }
@@ -556,9 +666,7 @@ mod tests {
             }),
         ));
 
-        let mut reader = BinaryFileReader::from(
-            vec![0x01, 0x02, 0x03, 0x04, 0x05]
-        );
+        let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
         assert_eq!(reader.read_u16()?, 0x0102);
         assert_eq!(reader.read_u16()?, 0x0304);
         assert!(matches!(
@@ -569,31 +677,29 @@ mod tests {
                 available_bytes: 1,
             }),
         ));
-        assert_eq!(reader.read()?,0x05);
+        assert_eq!(reader.read()?, 0x05);
 
         Ok(())
     }
-    
 
     #[test]
     fn test_expect() -> Result<(), BinaryFileReaderError> {
-
         let v: Vec<u8> = (0..=255).collect();
         let mut reader1 = BinaryFileReader::from(v);
-        reader1.expect_peek(&[0,1,2,3,4,5])?;
-        reader1.expect(&[0,1,2,3,4,5])?;
+        reader1.expect_peek(&[0, 1, 2, 3, 4, 5])?;
+        reader1.expect(&[0, 1, 2, 3, 4, 5])?;
         assert_eq!(reader1.available_bytes(), 256 - 6);
-        assert_eq!(reader1.current_offset(),6);
-        reader1.expect_peek(&[6,7,8,9,10])?;
-        reader1.expect(&[6,7,8,9,10])?;
+        assert_eq!(reader1.current_offset(), 6);
+        reader1.expect_peek(&[6, 7, 8, 9, 10])?;
+        reader1.expect(&[6, 7, 8, 9, 10])?;
         assert_eq!(reader1.available_bytes(), 256 - 11);
-        assert_eq!(reader1.current_offset(),11);
+        assert_eq!(reader1.current_offset(), 11);
 
         let v: Vec<u8> = (0..=255).collect();
         let mut a = BinaryFileReader::from(v);
-        let mut b = a.split_off_front(128)?; 
-        b.expect(&[0,1,2,3,4])?;
-        a.expect(&[128,129,130,131,132])?;
+        let mut b = a.split_off_front(128)?;
+        b.expect(&[0, 1, 2, 3, 4])?;
+        a.expect(&[128, 129, 130, 131, 132])?;
         assert_eq!(b.available_bytes(), 123);
         assert_eq!(a.available_bytes(), 123);
         assert_eq!(b.current_offset(), 5);
@@ -601,16 +707,43 @@ mod tests {
 
         let v: Vec<u8> = (0..=255).collect();
         let mut reader = BinaryFileReader::from(v);
-        assert!(reader.expect(&[1,2,3,4,5]).is_err());
-        assert!(reader.expect(&[0,1,2,3,4,5,7]).is_err());
-        assert!(reader.expect_peek(&[1,2,3,4,5]).is_err());
-        assert!(reader.expect_peek(&[0,1,2,3,4,5,7]).is_err());
-        assert!(reader.expect_peek(&[0,1,2,3,4,5]).is_ok());
-        assert!(reader.expect(&[0,1,2,3,4,5]).is_ok());
-        assert!(reader.expect(&[0,1,2,3,4,5]).is_err());
+        assert!(reader.expect(&[1, 2, 3, 4, 5]).is_err());
+        assert!(reader.expect(&[0, 1, 2, 3, 4, 5, 7]).is_err());
+        assert!(reader.expect_peek(&[1, 2, 3, 4, 5]).is_err());
+        assert!(reader.expect_peek(&[0, 1, 2, 3, 4, 5, 7]).is_err());
+        assert!(reader.expect_peek(&[0, 1, 2, 3, 4, 5]).is_ok());
+        assert!(reader.expect(&[0, 1, 2, 3, 4, 5]).is_ok());
+        assert!(reader.expect(&[0, 1, 2, 3, 4, 5]).is_err());
 
         Ok(())
     }
-    
-    
+
+    #[test]
+    fn test_peek() -> Result<(), BinaryFileReaderError> {
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader1 = BinaryFileReader::from(v);
+        assert_eq!(reader1.peek()?, 0);
+        assert_eq!(reader1.peek_u16()?, 0x0001);
+        assert_eq!(reader1.peek_u4()?, (0, 0));
+
+        for i in 0..256 {
+            assert_eq!(reader1.peek_at(i)?, i as u8);
+        }
+
+        assert_eq!(reader1.current_offset(), 0);
+        reader1.read()?;
+        assert_eq!(reader1.peek()?, 1);
+        assert_eq!(reader1.peek_u16()?, 0x0102);
+        assert_eq!(reader1.peek_u4()?, (0, 1));
+        assert_eq!(reader1.current_offset(), 1);
+
+        assert!(matches!(
+            reader1.peek_at(256),
+            Err(BinaryFileReaderError::OufOfRange {
+                buffer_size: 255,
+                got: 256
+            })
+        ));
+        Ok(())
+    }
 }

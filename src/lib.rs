@@ -26,7 +26,7 @@ impl BinaryFileReader {
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
     /// assert_eq!(reader.current_offset(),0);
-    /// assert_eq!(reader.shift()?,0x01);
+    /// assert_eq!(reader.read()?,0x01);
     /// assert_eq!(reader.current_offset(),1);
     ///
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
@@ -51,7 +51,7 @@ impl BinaryFileReader {
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
     /// assert_eq!(reader.available_bytes(),4);
-    /// assert_eq!(reader.shift()?,0x01);
+    /// assert_eq!(reader.read()?,0x01);
     /// assert_eq!(reader.available_bytes(),3);
     ///
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
@@ -80,10 +80,10 @@ impl BinaryFileReader {
     /// let mut splited = reader.split_off_front(2)?;
     ///
     /// assert_eq!(splited.current_offset(),0);
-    /// assert_eq!(splited.shift()?,0x01);
+    /// assert_eq!(splited.read()?,0x01);
     ///
     /// assert_eq!(reader.current_offset(),2);
-    /// assert_eq!(reader.shift()?,0x03);
+    /// assert_eq!(reader.read()?,0x03);
     /// #
     /// # Ok(())
     /// # }
@@ -111,14 +111,19 @@ impl BinaryFileReader {
         })
     }
 
+    //----------------------------------------------------------------------------------------------------//
+    //                                                                                                    //
+    //                                                READ                                                //
+    //                                                                                                    //
+    //----------------------------------------------------------------------------------------------------//
     /// # Examples
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02]);
-    /// assert_eq!(reader.shift()?,0x01);
-    /// assert_eq!(reader.shift()?,0x02);
-    /// assert!(reader.shift().is_err());
+    /// assert_eq!(reader.read()?,0x01);
+    /// assert_eq!(reader.read()?,0x02);
+    /// assert!(reader.read().is_err());
     /// #
     /// # Ok(())
     /// # }
@@ -126,7 +131,7 @@ impl BinaryFileReader {
     /// #    try_main().unwrap();
     /// # }
     /// ```
-    pub fn shift(&mut self) -> Result<u8, BinaryFileReaderError> {
+    pub fn read(&mut self) -> Result<u8, BinaryFileReaderError> {
         match self.buffer.pop_front() {
             Some(shifted) => {
                 self.current_offset += 1;
@@ -145,10 +150,10 @@ impl BinaryFileReader {
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04,0x05]);
-    /// assert_eq!(reader.shift_u16()?,0x0102);
-    /// assert_eq!(reader.shift_u16()?,0x0304);
-    /// assert!(reader.shift_u16().is_err());
-    /// assert_eq!(reader.shift()?,0x05);
+    /// assert_eq!(reader.read_u16()?,0x0102);
+    /// assert_eq!(reader.read_u16()?,0x0304);
+    /// assert!(reader.read_u16().is_err());
+    /// assert_eq!(reader.read()?,0x05);
     /// #
     /// # Ok(())
     /// # }
@@ -156,7 +161,7 @@ impl BinaryFileReader {
     /// #    try_main().unwrap();
     /// # }
     /// ```
-    pub fn shift_u16(&mut self) -> Result<u16, BinaryFileReaderError> {
+    pub fn read_u16(&mut self) -> Result<u16, BinaryFileReaderError> {
         if self.buffer.len() < 2 {
             return Err(BinaryFileReaderError::BufferUnderflow {
                 requested_bytes: 2,
@@ -177,11 +182,11 @@ impl BinaryFileReader {
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x12,0x34]);
-    /// let (upper,lower) = reader.shift_u4()?;
+    /// let (upper,lower) = reader.read_u4()?;
     /// assert_eq!(upper,0x01);
     /// assert_eq!(lower,0x02);
-    /// assert_eq!(reader.shift_u4()?,(0x03,0x04));
-    /// assert!(reader.shift_u4().is_err());
+    /// assert_eq!(reader.read_u4()?,(0x03,0x04));
+    /// assert!(reader.read_u4().is_err());
     /// #
     /// # Ok(())
     /// # }
@@ -189,7 +194,7 @@ impl BinaryFileReader {
     /// #    try_main().unwrap();
     /// # }
     /// ```
-    pub fn shift_u4(&mut self) -> Result<(u8, u8), BinaryFileReaderError> {
+    pub fn read_u4(&mut self) -> Result<(u8, u8), BinaryFileReaderError> {
         match self.buffer.pop_front() {
             Some(shifted) => {
                 self.current_offset += 1;
@@ -204,6 +209,46 @@ impl BinaryFileReader {
             }),
         }
     }
+
+    /// # Examples
+    /// ```
+    /// # use std::collections::VecDeque;
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
+    /// #
+    /// let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+    /// let taked = reader.read_bytes(2)?;
+    ///
+    /// assert_eq!(taked, VecDeque::from([0x01, 0x02]));
+    /// assert!(reader.expect(&[0x03,0x04,0x05]).is_ok());
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn read_bytes(&mut self, n: usize) -> Result<VecDeque<u8>, BinaryFileReaderError> {
+        if n > self.buffer.len() {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: n,
+                current_offset: self.current_offset,
+                available_bytes: self.buffer.len(),
+            });
+        };
+        let splited = self.buffer.split_off(n);
+        let taked = std::mem::replace(&mut self.buffer, splited);
+        self.current_offset += n;
+        Ok(taked)
+    }
+    
+    
+    
+
+    //----------------------------------------------------------------------------------------------------//
+    //                                                                                                    //
+    //                                               EXPECT                                               //
+    //                                                                                                    //
+    //----------------------------------------------------------------------------------------------------//   
 
     /// # Examples
     /// ```
@@ -287,36 +332,6 @@ impl BinaryFileReader {
         self.buffer
     }
 
-    /// # Examples
-    /// ```
-    /// # use std::collections::VecDeque;
-    /// # use binary_file_reader::BinaryFileReader;
-    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
-    /// #
-    /// let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
-    /// let taked = reader.take_bytes(2)?;
-    ///
-    /// assert_eq!(taked, VecDeque::from([0x01, 0x02]));
-    /// assert!(reader.expect(&[0x03,0x04,0x05]).is_ok());
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #    try_main().unwrap();
-    /// # }
-    /// ```
-    pub fn take_bytes(&mut self, n: usize) -> Result<VecDeque<u8>, BinaryFileReaderError> {
-        if n > self.buffer.len() {
-            return Err(BinaryFileReaderError::BufferUnderflow {
-                requested_bytes: n,
-                current_offset: self.current_offset,
-                available_bytes: self.buffer.len(),
-            });
-        };
-        let splited = self.buffer.split_off(n);
-        let taked = std::mem::replace(&mut self.buffer, splited);
-        self.current_offset += n;
-        Ok(taked)
-    }
 }
 
 impl From<Vec<u8>> for BinaryFileReader {
@@ -330,6 +345,13 @@ impl From<Vec<u8>> for BinaryFileReader {
     }
 }
 
+
+
+//----------------------------------------------------------------------------------------------------//
+//                                                                                                    //
+//                                               TESTS                                                //
+//                                                                                                    //
+//----------------------------------------------------------------------------------------------------//
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
@@ -337,9 +359,9 @@ mod tests {
     use crate::{error::BinaryFileReaderError, BinaryFileReader};
 
     #[test]
-    fn test_take_bytes() -> Result<(), BinaryFileReaderError> {
+    fn test_read_bytes() -> Result<(), BinaryFileReaderError> {
         let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
-        let taked = reader.take_bytes(2)?;
+        let taked = reader.read_bytes(2)?;
 
         assert_eq!(reader.available_bytes(), 3);
         assert_eq!(reader.current_offset(), 2);
@@ -350,7 +372,7 @@ mod tests {
 
         let v: Vec<u8> = (0..=255).collect();
         let mut reader = BinaryFileReader::from(v);
-        let taked = reader.take_bytes(128)?;
+        let taked = reader.read_bytes(128)?;
         assert_eq!(taked, (0..128).collect::<Vec<u8>>());
         reader.expect_peek(&(128..=255).collect::<Vec<u8>>())?;
         assert_eq!(reader.available_bytes(),128);
@@ -376,11 +398,11 @@ mod tests {
     fn test_current_offset() -> Result<(), BinaryFileReaderError> {
         let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
         assert_eq!(reader.current_offset(), 0);
-        reader.shift()?;
+        reader.read()?;
         assert_eq!(reader.current_offset(), 1);
-        reader.shift()?;
+        reader.read()?;
         assert_eq!(reader.current_offset(), 2);
-        reader.shift_u16()?;
+        reader.read_u16()?;
         assert_eq!(reader.current_offset(), 4);
 
         let v: Vec<u8> = (0..=255).collect();
@@ -388,9 +410,9 @@ mod tests {
         let mut a = reader.split_off_front(128)?;
         assert_eq!(reader.current_offset(), 128);
         assert_eq!(a.current_offset(), 0);
-        a.take_bytes(64)?;
+        a.read_bytes(64)?;
         assert_eq!(a.current_offset(), 64);
-        let b = reader.take_bytes(64)?;
+        let b = reader.read_bytes(64)?;
         assert_eq!(b.len(), 64);
         assert_eq!(reader.current_offset(), 128 + 64);
 
@@ -401,13 +423,13 @@ mod tests {
     fn test_available_bytes() -> Result<(), BinaryFileReaderError> {
         let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
         assert_eq!(reader.available_bytes(), 5);
-        reader.shift()?;
+        reader.read()?;
         assert_eq!(reader.available_bytes(), 4);
-        reader.shift()?;
+        reader.read()?;
         assert_eq!(reader.available_bytes(), 3);
-        reader.shift_u16()?;
+        reader.read_u16()?;
         assert_eq!(reader.available_bytes(), 1);
-        reader.shift()?;
+        reader.read()?;
         assert_eq!(reader.available_bytes(), 0);
 
         let v: Vec<u8> = (0..=255).collect();
@@ -420,13 +442,13 @@ mod tests {
         assert_eq!(reader3.available_bytes(), 64);
         assert_eq!(reader2.available_bytes(), 64);
 
-        assert_eq!(reader3.shift()?, 0);
+        assert_eq!(reader3.read()?, 0);
         assert_eq!(reader3.available_bytes(), 63);
 
-        reader3.shift_u4()?;
+        reader3.read_u4()?;
         assert_eq!(reader3.available_bytes(), 62);
 
-        reader3.shift_u16()?;
+        reader3.read_u16()?;
         assert_eq!(reader3.available_bytes(), 60);
 
         reader3.expect(&[4, 5, 6, 7, 8])?;
@@ -435,7 +457,7 @@ mod tests {
         reader3.expect_peek(&[9, 10, 11, 12, 13])?;
         assert_eq!(reader3.available_bytes(), 55);
 
-        reader3.take_bytes(5)?;
+        reader3.read_bytes(5)?;
         assert_eq!(reader3.available_bytes(), 50);
 
         Ok(())
@@ -493,27 +515,27 @@ mod tests {
         reader3.expect_peek(&(64..128).collect::<Vec<u8>>())?;
         reader4.expect_peek(&(0..64).collect::<Vec<u8>>())?;
 
-        assert_eq!(reader1.shift()?, 128);
-        assert!(reader2.shift().is_err());
-        assert_eq!(reader3.shift()?, 64);
-        assert_eq!(reader4.shift()?, 0);
+        assert_eq!(reader1.read()?, 128);
+        assert!(reader2.read().is_err());
+        assert_eq!(reader3.read()?, 64);
+        assert_eq!(reader4.read()?, 0);
 
         Ok(())
     }
 
     #[test]
-    fn test_shift() -> Result<(), BinaryFileReaderError> {
+    fn test_read() -> Result<(), BinaryFileReaderError> {
         let v: Vec<u8> = (0..=255).collect();
         let mut reader1 = BinaryFileReader::from(v);
-        assert_eq!(reader1.shift()?, 0);
-        assert_eq!(reader1.shift_u16()?, 0x0102);
+        assert_eq!(reader1.read()?, 0);
+        assert_eq!(reader1.read_u16()?, 0x0102);
 
         let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03]);
-        assert_eq!(reader.shift()?, 0x01);
-        assert_eq!(reader.shift()?, 0x02);
-        assert_eq!(reader.shift()?, 0x03);
+        assert_eq!(reader.read()?, 0x01);
+        assert_eq!(reader.read()?, 0x02);
+        assert_eq!(reader.read()?, 0x03);
         assert!(matches!(
-            reader.shift(),
+            reader.read(),
             Err(BinaryFileReaderError::BufferUnderflow {
                 requested_bytes: 1,
                 current_offset: 3,
@@ -522,11 +544,11 @@ mod tests {
         ));
 
         let mut reader = BinaryFileReader::from(vec![0xab, 0xcd, 0xef]);
-        assert_eq!(reader.shift_u4()?, (0x0a, 0x0b));
-        assert_eq!(reader.shift_u4()?, (0x0c, 0x0d));
-        assert_eq!(reader.shift_u4()?, (0x0e, 0x0f));
+        assert_eq!(reader.read_u4()?, (0x0a, 0x0b));
+        assert_eq!(reader.read_u4()?, (0x0c, 0x0d));
+        assert_eq!(reader.read_u4()?, (0x0e, 0x0f));
         assert!(matches!(
-            reader.shift_u4(),
+            reader.read_u4(),
             Err(BinaryFileReaderError::BufferUnderflow {
                 requested_bytes: 1,
                 current_offset: 3,
@@ -537,17 +559,17 @@ mod tests {
         let mut reader = BinaryFileReader::from(
             vec![0x01, 0x02, 0x03, 0x04, 0x05]
         );
-        assert_eq!(reader.shift_u16()?, 0x0102);
-        assert_eq!(reader.shift_u16()?, 0x0304);
+        assert_eq!(reader.read_u16()?, 0x0102);
+        assert_eq!(reader.read_u16()?, 0x0304);
         assert!(matches!(
-            reader.shift_u16(),
+            reader.read_u16(),
             Err(BinaryFileReaderError::BufferUnderflow {
                 requested_bytes: 2,
                 current_offset: 4,
                 available_bytes: 1,
             }),
         ));
-        assert_eq!(reader.shift()?,0x05);
+        assert_eq!(reader.read()?,0x05);
 
         Ok(())
     }

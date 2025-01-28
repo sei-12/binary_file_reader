@@ -1,2 +1,2 @@
 # binary_file_reader
-Simple binary file data reader for Rust.
+A utility library for reading binary files intuitively, providing tools for extracting, navigating, and processing binary data.

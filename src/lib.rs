@@ -4,6 +4,7 @@ use error::BinaryFileReaderError;
 
 pub mod error;
 
+#[derive(Debug)]
 pub struct BinaryFileReader {
     current_offset: usize,
     buffer: VecDeque<u8>,
@@ -29,7 +30,7 @@ impl BinaryFileReader {
     /// assert_eq!(reader.current_offset(),1);
     ///
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
-    /// let mut splited = reader.split(2)?;
+    /// let mut splited = reader.split_off_front(2)?;
     /// assert_eq!(splited.current_offset(),0);
     /// assert_eq!(reader.current_offset(),2);
     /// #
@@ -54,7 +55,7 @@ impl BinaryFileReader {
     /// assert_eq!(reader.available_bytes(),3);
     ///
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
-    /// let mut splited = reader.split(2)?;
+    /// let mut splited = reader.split_off_front(2)?;
     /// assert_eq!(splited.available_bytes(),2);
     /// assert_eq!(reader.available_bytes(),2);
     /// #
@@ -76,7 +77,7 @@ impl BinaryFileReader {
     /// # use binary_file_reader::error::BinaryFileReaderError;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> { // line that wraps the body shown in doc
     /// let mut reader = BinaryFileReader::from(vec![0x01,0x02,0x03,0x04]);
-    /// let mut splited = reader.split(2)?;
+    /// let mut splited = reader.split_off_front(2)?;
     ///
     /// assert_eq!(splited.current_offset(),0);
     /// assert_eq!(splited.shift()?,0x01);
@@ -90,7 +91,7 @@ impl BinaryFileReader {
     /// #    try_main().unwrap();
     /// # }
     /// ```
-    pub fn split(&mut self, n: usize) -> Result<Self, BinaryFileReaderError> {
+    pub fn split_off_front(&mut self, n: usize) -> Result<Self, BinaryFileReaderError> {
         if n > self.buffer.len() {
             return Err(BinaryFileReaderError::BufferUnderflow {
                 current_offset: self.current_offset,
@@ -281,6 +282,7 @@ impl BinaryFileReader {
     /// #    try_main().unwrap();
     /// # }
     /// ```
+    #[inline]
     pub fn take(self) -> VecDeque<u8> {
         self.buffer
     }
@@ -344,6 +346,16 @@ mod tests {
 
         assert_eq!(taked, VecDeque::from([0x01, 0x02]));
         assert!(reader.expect(&[0x03, 0x04, 0x05]).is_ok());
+        
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader = BinaryFileReader::from(v);
+        let taked = reader.take_bytes(128)?;
+        assert_eq!(taked, (0..128).collect::<Vec<u8>>());
+        reader.expect_peek(&(128..=255).collect::<Vec<u8>>())?;
+        assert_eq!(reader.available_bytes(),128);
+        assert_eq!(reader.current_offset(),128);
+
 
         Ok(())
     }
@@ -359,4 +371,224 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_current_offset() -> Result<(), BinaryFileReaderError> {
+        let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+        assert_eq!(reader.current_offset(), 0);
+        reader.shift()?;
+        assert_eq!(reader.current_offset(), 1);
+        reader.shift()?;
+        assert_eq!(reader.current_offset(), 2);
+        reader.shift_u16()?;
+        assert_eq!(reader.current_offset(), 4);
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader = BinaryFileReader::from(v);
+        let mut a = reader.split_off_front(128)?;
+        assert_eq!(reader.current_offset(), 128);
+        assert_eq!(a.current_offset(), 0);
+        a.take_bytes(64)?;
+        assert_eq!(a.current_offset(), 64);
+        let b = reader.take_bytes(64)?;
+        assert_eq!(b.len(), 64);
+        assert_eq!(reader.current_offset(), 128 + 64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_available_bytes() -> Result<(), BinaryFileReaderError> {
+        let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+        assert_eq!(reader.available_bytes(), 5);
+        reader.shift()?;
+        assert_eq!(reader.available_bytes(), 4);
+        reader.shift()?;
+        assert_eq!(reader.available_bytes(), 3);
+        reader.shift_u16()?;
+        assert_eq!(reader.available_bytes(), 1);
+        reader.shift()?;
+        assert_eq!(reader.available_bytes(), 0);
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader1 = BinaryFileReader::from(v);
+        let mut reader2 = reader1.split_off_front(128)?;
+        assert_eq!(reader1.available_bytes(), 128);
+        assert_eq!(reader2.available_bytes(), 128);
+        let mut reader3 = reader2.split_off_front(64)?;
+        assert_eq!(reader1.available_bytes(), 128);
+        assert_eq!(reader3.available_bytes(), 64);
+        assert_eq!(reader2.available_bytes(), 64);
+
+        assert_eq!(reader3.shift()?, 0);
+        assert_eq!(reader3.available_bytes(), 63);
+
+        reader3.shift_u4()?;
+        assert_eq!(reader3.available_bytes(), 62);
+
+        reader3.shift_u16()?;
+        assert_eq!(reader3.available_bytes(), 60);
+
+        reader3.expect(&[4, 5, 6, 7, 8])?;
+        assert_eq!(reader3.available_bytes(), 55);
+
+        reader3.expect_peek(&[9, 10, 11, 12, 13])?;
+        assert_eq!(reader3.available_bytes(), 55);
+
+        reader3.take_bytes(5)?;
+        assert_eq!(reader3.available_bytes(), 50);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_off_front() -> Result<(), BinaryFileReaderError> {
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader1 = BinaryFileReader::from(v);
+
+        reader1.expect_peek(&(0..=255).collect::<Vec<u8>>())?;
+
+        let mut reader2 = reader1.split_off_front(128)?;
+        reader2.expect_peek(&(0..128).collect::<Vec<u8>>())?;
+        reader1.expect_peek(&(128..=255).collect::<Vec<u8>>())?;
+
+        assert_eq!(reader1.current_offset(), 128);
+        assert_eq!(reader2.current_offset(), 0);
+
+        let err = reader2.split_off_front(129).unwrap_err();
+        assert!(matches!(
+            err,
+            BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 129,
+                current_offset: 0,
+                available_bytes: 128
+            }
+        ));
+
+        let err = reader2.split_off_front(132).unwrap_err();
+        assert!(matches!(
+            err,
+            BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 132,
+                current_offset: 0,
+                available_bytes: 128
+            }
+        ));
+
+        let err = reader1.split_off_front(132).unwrap_err();
+        assert!(matches!(
+            err,
+            BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 132,
+                current_offset: 128,
+                available_bytes: 128
+            }
+        ));
+
+        let mut reader3 = reader2.split_off_front(128)?;
+        assert_eq!(reader2.available_bytes(), 0);
+        reader3.expect_peek(&(0..128).collect::<Vec<u8>>())?;
+
+        let mut reader4 = reader3.split_off_front(64)?;
+        reader3.expect_peek(&(64..128).collect::<Vec<u8>>())?;
+        reader4.expect_peek(&(0..64).collect::<Vec<u8>>())?;
+
+        assert_eq!(reader1.shift()?, 128);
+        assert!(reader2.shift().is_err());
+        assert_eq!(reader3.shift()?, 64);
+        assert_eq!(reader4.shift()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_shift() -> Result<(), BinaryFileReaderError> {
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader1 = BinaryFileReader::from(v);
+        assert_eq!(reader1.shift()?, 0);
+        assert_eq!(reader1.shift_u16()?, 0x0102);
+
+        let mut reader = BinaryFileReader::from(vec![0x01, 0x02, 0x03]);
+        assert_eq!(reader.shift()?, 0x01);
+        assert_eq!(reader.shift()?, 0x02);
+        assert_eq!(reader.shift()?, 0x03);
+        assert!(matches!(
+            reader.shift(),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 1,
+                current_offset: 3,
+                available_bytes: 0,
+            }),
+        ));
+
+        let mut reader = BinaryFileReader::from(vec![0xab, 0xcd, 0xef]);
+        assert_eq!(reader.shift_u4()?, (0x0a, 0x0b));
+        assert_eq!(reader.shift_u4()?, (0x0c, 0x0d));
+        assert_eq!(reader.shift_u4()?, (0x0e, 0x0f));
+        assert!(matches!(
+            reader.shift_u4(),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 1,
+                current_offset: 3,
+                available_bytes: 0,
+            }),
+        ));
+
+        let mut reader = BinaryFileReader::from(
+            vec![0x01, 0x02, 0x03, 0x04, 0x05]
+        );
+        assert_eq!(reader.shift_u16()?, 0x0102);
+        assert_eq!(reader.shift_u16()?, 0x0304);
+        assert!(matches!(
+            reader.shift_u16(),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 2,
+                current_offset: 4,
+                available_bytes: 1,
+            }),
+        ));
+        assert_eq!(reader.shift()?,0x05);
+
+        Ok(())
+    }
+    
+
+    #[test]
+    fn test_expect() -> Result<(), BinaryFileReaderError> {
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader1 = BinaryFileReader::from(v);
+        reader1.expect_peek(&[0,1,2,3,4,5])?;
+        reader1.expect(&[0,1,2,3,4,5])?;
+        assert_eq!(reader1.available_bytes(), 256 - 6);
+        assert_eq!(reader1.current_offset(),6);
+        reader1.expect_peek(&[6,7,8,9,10])?;
+        reader1.expect(&[6,7,8,9,10])?;
+        assert_eq!(reader1.available_bytes(), 256 - 11);
+        assert_eq!(reader1.current_offset(),11);
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut a = BinaryFileReader::from(v);
+        let mut b = a.split_off_front(128)?; 
+        b.expect(&[0,1,2,3,4])?;
+        a.expect(&[128,129,130,131,132])?;
+        assert_eq!(b.available_bytes(), 123);
+        assert_eq!(a.available_bytes(), 123);
+        assert_eq!(b.current_offset(), 5);
+        assert_eq!(a.current_offset(), 128 + 5);
+
+        let v: Vec<u8> = (0..=255).collect();
+        let mut reader = BinaryFileReader::from(v);
+        assert!(reader.expect(&[1,2,3,4,5]).is_err());
+        assert!(reader.expect(&[0,1,2,3,4,5,7]).is_err());
+        assert!(reader.expect_peek(&[1,2,3,4,5]).is_err());
+        assert!(reader.expect_peek(&[0,1,2,3,4,5,7]).is_err());
+        assert!(reader.expect_peek(&[0,1,2,3,4,5]).is_ok());
+        assert!(reader.expect(&[0,1,2,3,4,5]).is_ok());
+        assert!(reader.expect(&[0,1,2,3,4,5]).is_err());
+
+        Ok(())
+    }
+    
+    
 }

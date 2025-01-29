@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Chunk Name: {}", chunk_name);
         println!("  {:<20}: {}", "length", chunk_length);
 
-        match chunk_name.as_str() {
+        match chunk_name {
             "IHDR" => {
                 println!("  {:<20}: {}", "width", chunk_reader.read_u32()?);
                 println!("  {:<20}: {}", "height", chunk_reader.read_u32()?);

@@ -486,7 +486,6 @@ impl<'a> BinaryFileReader<'a> {
         Ok(())
     }
 
-
     /// # Examples
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
@@ -506,7 +505,7 @@ impl<'a> BinaryFileReader<'a> {
     /// # }
     /// ```
     pub fn expect_utf8(&mut self, expect_str: &str) -> Result<(), BinaryFileReaderError> {
-        self.expect(expect_str.as_bytes())?;        
+        self.expect(expect_str.as_bytes())?;
         Ok(())
     }
 
@@ -705,14 +704,12 @@ mod tests {
 
     #[test]
     fn test_utf8() -> Result<(), BinaryFileReaderError> {
-
         let text = "Hello, world!";
         let binary_data: Vec<u8> = text.as_bytes().to_vec();
         let mut reader = BinaryFileReader::new(&binary_data);
         assert_eq!(reader.peek_utf8(13)?, "Hello, world!");
         assert_eq!(reader.read_utf8(13)?, "Hello, world!");
         assert!(reader.read_utf8(10).is_err());
-        
 
         let text = "こんにちは";
         let binary_data: Vec<u8> = text.as_bytes().to_vec();

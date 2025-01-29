@@ -527,15 +527,29 @@ impl<'a> BinaryFileReader<'a> {
     /// ```
     pub fn expect_peek(&self, expect_bytes: &[u8]) -> Result<(), BinaryFileReaderError> {
         if self.available_bytes() < expect_bytes.len() {
-            dbg!(self.available_bytes(), expect_bytes.len());
-            return Err(BinaryFileReaderError::Expect {});
+            let require = Vec::from(expect_bytes);
+            return Err(BinaryFileReaderError::ExpectInsufficientBytes {
+                require,
+                available_bytes: self.available_bytes(),
+                current_offset: self.current_offset(),
+            });
         }
 
-        for (i, expect) in expect_bytes.iter().enumerate() {
-            if self.buf[self.current_offset + i] == *expect {
+        let slice = &self.buf[self.current_offset..self.current_offset + expect_bytes.len()];
+
+        for (req, got) in expect_bytes.iter().zip(slice) {
+            if *req == *got {
                 continue;
             }
-            return Err(BinaryFileReaderError::Expect {});
+
+            let require = Vec::from(expect_bytes);
+            let got = Vec::from(slice);
+            return Err(BinaryFileReaderError::Expect {
+                require,
+                got,
+                current_offset: self.current_offset(),
+                available_bytes: self.available_bytes(),
+            });
         }
 
         Ok(())

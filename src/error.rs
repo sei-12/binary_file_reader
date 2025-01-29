@@ -12,9 +12,20 @@ pub enum BinaryFileReaderError {
         available_bytes: usize,
     },
 
-    Expect {},
+    ExpectInsufficientBytes {
+        require: Vec<u8>,
+        available_bytes: usize,
+        current_offset: usize,
+    },
 
-    OufOfRange {
+    Expect {
+        require: Vec<u8>,
+        got: Vec<u8>,
+        available_bytes: usize,
+        current_offset: usize,
+    },
+
+    OutOfRange {
         buffer_size: usize,
         got: usize,
     },
@@ -32,8 +43,9 @@ impl std::error::Error for BinaryFileReaderError {
             BinaryFileReaderError::Utf8Error(err) => Some(err),
             BinaryFileReaderError::IO(err) => Some(err),
             BinaryFileReaderError::BufferUnderflow { .. } => None,
-            BinaryFileReaderError::Expect {} => None,
-            BinaryFileReaderError::OufOfRange { .. } => None,
+            BinaryFileReaderError::ExpectInsufficientBytes { .. } => None,
+            BinaryFileReaderError::Expect { .. } => None,
+            BinaryFileReaderError::OutOfRange { .. } => None,
         }
     }
 }
@@ -43,10 +55,11 @@ impl From<Utf8Error> for BinaryFileReaderError {
         Self::Utf8Error(value)
     }
 }
+
 impl fmt::Display for BinaryFileReaderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BinaryFileReaderError::Utf8Error(err) => write!(f,"Utf8Error: {}", err),
+            BinaryFileReaderError::Utf8Error(err) => write!(f, "Utf8Error: {}", err),
             BinaryFileReaderError::IO(err) => write!(f, "IO error: {}", err),
             BinaryFileReaderError::BufferUnderflow {
                 requested_bytes,
@@ -57,13 +70,29 @@ impl fmt::Display for BinaryFileReaderError {
                 "Buffer underflow: requested {} bytes at offset {}, but only {} bytes are available",
                 requested_bytes, current_offset, available_bytes
             ),
-            BinaryFileReaderError::Expect {  } => write!(
+            BinaryFileReaderError::ExpectInsufficientBytes {
+                require,
+                available_bytes,
+                current_offset,
+            } => write!(
                 f,
-                "", 
+                "Expectation failed: required {:?}, but only {} bytes are available at offset {}",
+                require, available_bytes, current_offset
             ),
-            BinaryFileReaderError::OufOfRange { .. } => write!(
+            BinaryFileReaderError::Expect {
+                require,
+                got,
+                available_bytes,
+                current_offset,
+            } => write!(
                 f,
-                ""
+                "Expectation failed: required {:?}, got {:?}, available bytes: {}, offset: {}",
+                require, got, available_bytes, current_offset
+            ),
+            BinaryFileReaderError::OutOfRange { buffer_size, got } => write!(
+                f,
+                "Out of range error: attempted to access index {} in a buffer of size {}",
+                got, buffer_size
             )
         }
     }

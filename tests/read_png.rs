@@ -27,7 +27,7 @@ fn test() -> Result<(), BinaryFileReaderError> {
             d: 28,
         },
         Chunk::Text("Comment\0Created with GIMP".to_string()),
-        Chunk::Unknown
+        Chunk::Unknown,
     ];
     assert_eq!(f, expect);
 
@@ -39,7 +39,7 @@ fn read_png(path: &str) -> Result<Vec<Chunk>, BinaryFileReaderError> {
     let mut reader = BinaryFileReader::new(&buffer);
 
     reader.expect(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])?;
-    
+
     let mut chunks = Vec::new();
 
     loop {

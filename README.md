@@ -10,7 +10,7 @@ The following example prints information about a PNG file.
 
 ```toml
 [dependencies]
-binary_file_reader = { git = "https://github.com/sei-12/binary_file_reader.git" , tag = "0.1.1" }
+binary_file_reader = { git = "https://github.com/sei-12/binary_file_reader.git" , tag = "0.1.2" }
 ```
 
 ```rust

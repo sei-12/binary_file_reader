@@ -830,6 +830,58 @@ mod tests {
     }
 
     #[test]
+    fn test2() -> Result<(), BinaryFileReaderError> {
+        let buffer: Vec<u8> = (0..=255).collect();
+        let mut reader = BinaryFileReader::new(&buffer);
+        assert_eq!(reader.available_bytes(), 256);
+
+        let slice = reader.peek_slice(10)?;
+        assert_eq!(slice, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(reader.available_bytes(), 256);
+        assert_eq!(reader.current_offset(), 0);
+
+        let slice = reader.read_slice(10)?;
+        assert_eq!(slice, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(reader.available_bytes(), 246);
+        assert_eq!(reader.current_offset(), 10);
+
+        let mut reader2 = reader.split_off_front(100)?;
+        assert_eq!(reader.available_bytes(), 146);
+        assert_eq!(reader2.available_bytes(), 100);
+        assert_eq!(reader2.read_u8()?, 10);
+        assert_eq!(reader2.read_u16()?, 0x0b0c);
+        assert_eq!(reader2.read_u32()?, 0x0d0e0f10);
+        assert_eq!(reader2.read_u64()?, 0x1112131415161718);
+        assert_eq!(reader2.available_bytes(), 85);
+        assert_eq!(reader2.current_offset(), 25);
+        assert!(matches!(
+            reader2.split_off_front(86),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 86,
+                current_offset: 25,
+                available_bytes: 85
+            })
+        ));
+        let mut reader2 = reader2.split_off_front(85)?;
+        assert!(matches!(
+            reader2.split_off_front(86),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 86,
+                current_offset: 25,
+                available_bytes: 85
+            })
+        ));
+
+        let slice = reader.peek_slice(10)?;
+        assert_eq!(slice, &[110, 111, 112, 113, 114, 115, 116, 117, 118, 119]);
+        let slice = reader.read_slice(10)?;
+        assert_eq!(slice, &[110, 111, 112, 113, 114, 115, 116, 117, 118, 119]);
+        assert_eq!(reader.available_bytes(), 136);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_slice() -> Result<(), BinaryFileReaderError> {
         let buffer = vec![0, 1, 2, 3, 4, 5, 6, 7];
         let mut reader = BinaryFileReader::new(&buffer);

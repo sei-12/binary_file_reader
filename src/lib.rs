@@ -9,7 +9,7 @@ pub struct BinaryFileReader<'a> {
     buf: &'a [u8],
 }
 
-impl BinaryFileReader<'_> {
+impl<'a> BinaryFileReader<'a> {
     fn peek(&self, buffer: &mut [u8]) -> Result<(), BinaryFileReaderError> {
         if buffer.len() > self.available_bytes() {
             return Err(BinaryFileReaderError::BufferUnderflow {
@@ -28,6 +28,19 @@ impl BinaryFileReader<'_> {
         self.peek(buffer)?;
         self.current_offset += buffer.len();
         Ok(())
+    }
+
+    fn get_slice(&self, length: usize) -> Result<&'a [u8], BinaryFileReaderError> {
+        if length > self.available_bytes() {
+            return Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: length,
+                current_offset: self.current_offset,
+                available_bytes: self.available_bytes(),
+            });
+        };
+
+        let slice = &self.buf[self.current_offset..self.current_offset + length];
+        Ok(slice)
     }
 }
 
@@ -256,6 +269,28 @@ impl<'a> BinaryFileReader<'a> {
     /// ```
     /// # use binary_file_reader::BinaryFileReader;
     /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let buffer = vec![0,1,2,3,4,5,6,7];
+    /// let mut reader = BinaryFileReader::new(&buffer);
+    /// assert_eq!(reader.read_slice(3)?,&[0,1,2]);
+    /// assert_eq!(reader.read_slice(3)?,&[3,4,5]);
+    /// assert!(reader.read_slice(3).is_err());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn read_slice(&mut self, length: usize) -> Result<&'a [u8], BinaryFileReaderError> {
+        let slice = self.get_slice(length)?;
+        self.current_offset += length;
+        Ok(slice)
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     /// let text = "Hello, world!";
     /// let binary_data: Vec<u8> = text.as_bytes().to_vec();
     /// let mut reader = BinaryFileReader::new(&binary_data);
@@ -428,6 +463,26 @@ impl<'a> BinaryFileReader<'a> {
     pub fn peek_bytes(&self, buffer: &mut [u8]) -> Result<(), BinaryFileReaderError> {
         self.peek(buffer)?;
         Ok(())
+    }
+
+    /// # Examples
+    /// ```
+    /// # use binary_file_reader::BinaryFileReader;
+    /// # fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let buffer = vec![0,1,2,3,4,5,6,7];
+    /// let reader = BinaryFileReader::new(&buffer);
+    /// assert_eq!(reader.peek_slice(3)?,&[0,1,2]);
+    /// assert_eq!(reader.peek_slice(3)?,&[0,1,2]);
+    /// assert_eq!(reader.peek_slice(3)?,&[0,1,2]);
+    /// #
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #    try_main().unwrap();
+    /// # }
+    /// ```
+    pub fn peek_slice(&self, length: usize) -> Result<&'a [u8], BinaryFileReaderError> {
+        self.get_slice(length)
     }
 
     /// # Examples
@@ -770,6 +825,39 @@ mod tests {
         assert!(splited.read_u8().is_err());
 
         assert_eq!(a.available_bytes(), 20);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_slice() -> Result<(), BinaryFileReaderError> {
+        let buffer = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let mut reader = BinaryFileReader::new(&buffer);
+        assert_eq!(reader.read_slice(3)?, &[0, 1, 2]);
+        assert_eq!(reader.read_slice(3)?, &[3, 4, 5]);
+        assert!(matches!(
+            reader.read_slice(10),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 10,
+                current_offset: 6,
+                available_bytes: 2
+            })
+        ));
+
+        let buffer = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let reader = BinaryFileReader::new(&buffer);
+        assert_eq!(reader.peek_slice(3)?, &[0, 1, 2]);
+        assert_eq!(reader.peek_slice(3)?, &[0, 1, 2]);
+        assert_eq!(reader.peek_slice(3)?, &[0, 1, 2]);
+        assert_eq!(reader.peek_slice(3)?, &[0, 1, 2]);
+        assert!(matches!(
+            reader.peek_slice(10),
+            Err(BinaryFileReaderError::BufferUnderflow {
+                requested_bytes: 10,
+                current_offset: 0,
+                available_bytes: 8
+            })
+        ));
 
         Ok(())
     }
